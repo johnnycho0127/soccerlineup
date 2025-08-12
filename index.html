@@ -1,11 +1,12 @@
 <!DOCTYPE html>
-<html lang="ko">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI 기반 축구 라인업 빌더 (UI 입력 기능 추가)</title>
+    <title>AI Soccer Lineup Builder</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     
     <!-- Google AdSense -->
     <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8206775175074829"
@@ -55,15 +56,47 @@
         input[type="range"] { -webkit-appearance: none; appearance: none; width: 100%; height: 8px; background: #4a5568; border-radius: 5px; outline: none; }
         input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 18px; height: 18px; background: #34d399; cursor: pointer; border-radius: 50%; }
         input[type="range"]::-moz-range-thumb { width: 18px; height: 18px; background: #34d399; cursor: pointer; border-radius: 50%; }
+
+        @media print {
+            body, .max-w-7xl {
+                margin: 0;
+                padding: 0;
+            }
+            body > *, #player-form-container, #player-list-container, header, .adsbygoogle, .action-buttons {
+                display: none !important;
+            }
+            main {
+                width: 100% !important;
+                height: 100vh !important;
+                position: absolute;
+                top: 0;
+                left: 0;
+            }
+            #field {
+                width: 100% !important;
+                height: 100% !important;
+                border: none !important;
+                box-shadow: none !important;
+                -webkit-print-color-adjust: exact; /* Chrome, Safari */
+                color-adjust: exact; /* Firefox */
+            }
+            .player.on-field {
+                -webkit-print-color-adjust: exact;
+                color-adjust: exact;
+            }
+            .player.on-field .player-name, .player.on-field .player-pos {
+                color: #fff !important; /* Ensure text is visible on dark background */
+                text-shadow: 1px 1px 2px #000;
+            }
+        }
     </style>
 </head>
 <body class="bg-gray-900 text-white p-4 lg:p-8">
 
     <div class="max-w-7xl mx-auto">
         <header class="text-center mb-8">
-            <h1 class="text-3xl lg:text-4xl font-bold text-green-400">조기축구 AI 라인업 빌더</h1>
-            <p class="text-gray-400 mt-2">선수 정보를 입력/수정하고 최적의 조합을 찾아보세요!</p>
-            <p class="text-sm text-gray-500 mt-2">Credit by Johnny Cho</p>
+            <h1 class="text-3xl lg:text-4xl font-bold text-green-400">AI Soccer Lineup Builder</h1>
+            <p class="text-gray-400 mt-2">Add/edit player info and find the optimal combination!</p>
         </header>
 
         <!-- AdSense Ad Unit -->
@@ -82,94 +115,102 @@
 
         <div class="flex flex-col lg:flex-row gap-8">
 
-            <!-- 선수 관리 패널 -->
+            <!-- Player Management Panel -->
             <aside class="lg:w-1/3 bg-gray-800 p-6 rounded-2xl shadow-lg flex flex-col">
-                <!-- 선수 입력 폼 -->
+                <!-- Player Input Form -->
                 <div id="player-form-container">
-                    <h2 class="text-2xl font-semibold mb-4 border-b border-gray-700 pb-2">선수 추가 / 편집</h2>
+                    <h2 class="text-2xl font-semibold mb-4 border-b border-gray-700 pb-2">Add / Edit Player</h2>
                     <form id="player-form" class="space-y-3">
                         <input type="hidden" id="playerId">
                         <div>
-                            <label for="playerName" class="block text-sm font-medium text-gray-300">이름</label>
+                            <label for="playerName" class="block text-sm font-medium text-gray-300">Name</label>
                             <input type="text" id="playerName" class="w-full bg-gray-700 border border-gray-600 rounded-md p-2 mt-1 text-white" required>
                         </div>
                         <div>
-                            <label for="playerPosition" class="block text-sm font-medium text-gray-300">주 포지션</label>
+                            <label for="playerPosition" class="block text-sm font-medium text-gray-300">Position</label>
                             <select id="playerPosition" class="w-full bg-gray-700 border border-gray-600 rounded-md p-2 mt-1 text-white">
                                 <option>FW</option><option>MF</option><option>DF</option><option>GK</option>
                             </select>
                         </div>
                         <div class="grid grid-cols-2 gap-4">
-                            <div><label class="text-sm">슈팅: <span id="shootingValue">50</span></label><input type="range" id="shooting" min="1" max="100" value="50"></div>
-                            <div><label class="text-sm">패스: <span id="passingValue">50</span></label><input type="range" id="passing" min="1" max="100" value="50"></div>
-                            <div><label class="text-sm">스피드: <span id="speedValue">50</span></label><input type="range" id="speed" min="1" max="100" value="50"></div>
-                            <div><label class="text-sm">체력: <span id="staminaValue">50</span></label><input type="range" id="stamina" min="1" max="100" value="50"></div>
-                            <div><label class="text-sm">피지컬: <span id="physicalValue">50</span></label><input type="range" id="physical" min="1" max="100" value="50"></div>
-                            <div><label class="text-sm">수비력: <span id="defenseValue">50</span></label><input type="range" id="defense" min="1" max="100" value="50"></div>
-                            <div class="col-span-2"><label class="text-sm">골키핑: <span id="goalkeepingValue">50</span></label><input type="range" id="goalkeeping" min="1" max="100" value="50"></div>
+                            <div><label class="text-sm">Shooting: <span id="shootingValue">50</span></label><input type="range" id="shooting" min="1" max="100" value="50"></div>
+                            <div><label class="text-sm">Passing: <span id="passingValue">50</span></label><input type="range" id="passing" min="1" max="100" value="50"></div>
+                            <div><label class="text-sm">Speed: <span id="speedValue">50</span></label><input type="range" id="speed" min="1" max="100" value="50"></div>
+                            <div><label class="text-sm">Stamina: <span id="staminaValue">50</span></label><input type="range" id="stamina" min="1" max="100" value="50"></div>
+                            <div><label class="text-sm">Physical: <span id="physicalValue">50</span></label><input type="range" id="physical" min="1" max="100" value="50"></div>
+                            <div><label class="text-sm">Defense: <span id="defenseValue">50</span></label><input type="range" id="defense" min="1" max="100" value="50"></div>
+                            <div class="col-span-2"><label class="text-sm">Goalkeeping: <span id="goalkeepingValue">50</span></label><input type="range" id="goalkeeping" min="1" max="100" value="50"></div>
                         </div>
                         <div class="flex gap-2 pt-2">
-                             <button type="submit" id="add-player-btn" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition">선수 추가</button>
-                             <button type="button" id="update-player-btn" class="flex-1 bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded-lg transition hidden">정보 수정</button>
-                             <button type="button" id="delete-player-btn" class="flex-1 bg-red-800 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg transition hidden">선수 삭제</button>
-                             <button type="button" id="clear-form-btn" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg transition">취소</button>
+                             <button type="submit" id="add-player-btn" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition">Add Player</button>
+                             <button type="button" id="update-player-btn" class="flex-1 bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded-lg transition hidden">Update Info</button>
+                             <button type="button" id="delete-player-btn" class="flex-1 bg-red-800 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg transition hidden">Delete Player</button>
+                             <button type="button" id="clear-form-btn" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg transition">Cancel</button>
                         </div>
                     </form>
                 </div>
                 
                 <div class="border-t border-gray-700 my-6"></div>
 
-                <!-- 선수 명단 -->
-                <div>
-                    <h2 class="text-2xl font-semibold mb-4">우리팀 선수 명단</h2>
+                <!-- Player Roster -->
+                <div id="player-list-container">
+                    <h2 class="text-2xl font-semibold mb-4">Team Roster</h2>
                     <div id="player-list" class="space-y-3 h-[300px] overflow-y-auto pr-2">
-                        <!-- 선수 카드가 여기에 동적으로 추가됩니다 -->
+                        <!-- Player cards will be dynamically added here -->
                     </div>
                 </div>
 
-                <div class="mt-auto pt-6">
+                <div class="mt-auto pt-6 action-buttons">
                      <button id="optimize-btn" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg transition duration-300 shadow-md">
-                        🤖 AI 최적 라인업 분석
+                        🤖 Analyze AI Best Lineup
                     </button>
                      <button id="reset-btn" class="mt-4 w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-4 rounded-lg transition duration-300 shadow-md">
-                        🔄 필드 초기화
+                        🔄 Reset Field
+                    </button>
+                     <button id="print-btn" class="mt-4 w-full bg-gray-500 hover:bg-gray-600 text-white font-bold py-3 px-4 rounded-lg transition duration-300 shadow-md">
+                        🖨️ Print
+                    </button>
+                     <button id="save-image-btn" class="mt-4 w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-4 rounded-lg transition duration-300 shadow-md">
+                        🖼️ Save as Image
                     </button>
                 </div>
             </aside>
 
-            <!-- 축구 필드 -->
+            <!-- Soccer Field -->
             <main class="lg:w-2/3">
                  <div id="field" class="field w-full aspect-[4/3] rounded-2xl p-4">
-                    <!-- 필드 라인 (시각적 요소) -->
+                    <!-- Field lines (visual elements) -->
                     <div class="absolute top-1/2 left-0 w-full h-px field-line -translate-y-1/2"></div>
                     <div class="absolute top-1/2 left-1/2 w-24 h-24 md:w-32 md:h-32 border-2 rounded-full center-circle -translate-x-1/2 -translate-y-1/2"></div>
                     <div class="absolute top-1/2 left-1/2 w-2 h-2 bg-white rounded-full -translate-x-1/2 -translate-y-1/2"></div>
                     <div class="absolute top-1/2 left-0 w-16 h-32 md:w-24 md:h-48 border-2 border-l-0 rounded-r-2xl field-line -translate-y-1/2"></div>
                     <div class="absolute top-1/2 right-0 w-16 h-32 md:w-24 md:h-48 border-2 border-r-0 rounded-l-2xl field-line -translate-y-1/2"></div>
-                    <!-- 선수들이 여기에 배치됩니다 -->
+                    <!-- Players will be placed here -->
                 </div>
             </main>
         </div>
     </div>
 
-    <!-- 메시지 모달 -->
-    <div id="message-modal" class="hidden fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50"><div class="bg-white text-gray-800 p-6 rounded-lg shadow-xl text-center w-11/12 md:w-1/3"><p id="message-text" class="text-lg font-medium"></p><button id="close-modal-btn" class="mt-6 bg-green-600 text-white px-6 py-2 rounded-lg font-bold">확인</button></div></div>
+    <!-- Message Modal -->
+    <div id="message-modal" class="hidden fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50"><div class="bg-white text-gray-800 p-6 rounded-lg shadow-xl text-center w-11/12 md:w-1/3"><p id="message-text" class="text-lg font-medium"></p><button id="close-modal-btn" class="mt-6 bg-green-600 text-white px-6 py-2 rounded-lg font-bold">OK</button></div></div>
 
 <script>
 document.addEventListener('DOMContentLoaded', () => {
 
-    // --- 데이터 및 변수 초기화 ---
-    let players = []; // 초기 선수 목록을 비웁니다.
+    // --- Data & Variable Initialization ---
+    let players = []; // Start with an empty player list.
 
     const playerList = document.getElementById('player-list');
     const field = document.getElementById('field');
     const optimizeBtn = document.getElementById('optimize-btn');
     const resetBtn = document.getElementById('reset-btn');
+    const printBtn = document.getElementById('print-btn');
+    const saveImageBtn = document.getElementById('save-image-btn');
     const messageModal = document.getElementById('message-modal');
     const messageText = document.getElementById('message-text');
     const closeModalBtn = document.getElementById('close-modal-btn');
 
-    // 폼 요소
+    // Form elements
     const playerForm = document.getElementById('player-form');
     const playerIdInput = document.getElementById('playerId');
     const playerNameInput = document.getElementById('playerName');
@@ -184,7 +225,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let draggedPlayer = null;
 
-    // --- 함수 정의 ---
+    // --- Function Definitions ---
 
     function renderPlayers() {
         playerList.innerHTML = '';
@@ -211,21 +252,21 @@ document.addEventListener('DOMContentLoaded', () => {
                 <p class="text-sm text-gray-400 player-pos">${player.position}</p>
             </div>
             <div class="grid grid-cols-3 gap-x-2 gap-y-1 mt-2 text-xs player-stats">
-                <span class="text-blue-300">슈팅: ${player.stats.shooting}</span><span class="text-green-300">패스: ${player.stats.passing}</span><span class="text-yellow-300">스피드: ${player.stats.speed}</span><span class="text-orange-300">체력: ${player.stats.stamina}</span><span class="text-purple-300">피지컬: ${player.stats.physical}</span><span class="text-red-300">수비: ${player.stats.defense}</span>
+                <span class="text-blue-300">Shooting: ${player.stats.shooting}</span><span class="text-green-300">Passing: ${player.stats.passing}</span><span class="text-yellow-300">Speed: ${player.stats.speed}</span><span class="text-orange-300">Stamina: ${player.stats.stamina}</span><span class="text-purple-300">Physical: ${player.stats.physical}</span><span class="text-red-300">Defense: ${player.stats.defense}</span>
             </div>
         `;
         return playerCard;
     }
 
-    // 선수 추가/수정/삭제 폼 관련 함수
-    function handleFormSubmit(e) { e.preventDefault(); const newPlayer = { id: 'p' + Date.now(), name: playerNameInput.value, position: playerPositionInput.value, stats: {} }; for (const key in statInputs) { newPlayer.stats[key] = parseInt(statInputs[key].value, 10); } players.push(newPlayer); renderPlayers(); clearForm(); showMessage(`${newPlayer.name} 선수가 추가되었습니다.`); }
-    function handleUpdatePlayer() { const id = playerIdInput.value; const playerIndex = players.findIndex(p => p.id === id); if (playerIndex > -1) { players[playerIndex].name = playerNameInput.value; players[playerIndex].position = playerPositionInput.value; for (const key in statInputs) { players[playerIndex].stats[key] = parseInt(statInputs[key].value, 10); } const playerCardOnField = document.getElementById(id); if (playerCardOnField) { playerCardOnField.querySelector('.player-name').textContent = players[playerIndex].name; playerCardOnField.querySelector('.player-pos').textContent = players[playerIndex].position; } renderPlayers(); clearForm(); showMessage('선수 정보가 수정되었습니다.'); } }
-    function handleDeletePlayer() { const id = playerIdInput.value; if (confirm('정말로 이 선수를 삭제하시겠습니까?')) { players = players.filter(p => p.id !== id); const playerCard = document.getElementById(id); if (playerCard) { playerCard.remove(); } renderPlayers(); clearForm(); showMessage('선수가 삭제되었습니다.'); } }
+    // Player Form Functions (Add/Update/Delete)
+    function handleFormSubmit(e) { e.preventDefault(); const newPlayer = { id: 'p' + Date.now(), name: playerNameInput.value, position: playerPositionInput.value, stats: {} }; for (const key in statInputs) { newPlayer.stats[key] = parseInt(statInputs[key].value, 10); } players.push(newPlayer); renderPlayers(); clearForm(); showMessage(`${newPlayer.name} has been added.`); }
+    function handleUpdatePlayer() { const id = playerIdInput.value; const playerIndex = players.findIndex(p => p.id === id); if (playerIndex > -1) { players[playerIndex].name = playerNameInput.value; players[playerIndex].position = playerPositionInput.value; for (const key in statInputs) { players[playerIndex].stats[key] = parseInt(statInputs[key].value, 10); } const playerCardOnField = document.getElementById(id); if (playerCardOnField) { playerCardOnField.querySelector('.player-name').textContent = players[playerIndex].name; playerCardOnField.querySelector('.player-pos').textContent = players[playerIndex].position; } renderPlayers(); clearForm(); showMessage('Player info has been updated.'); } }
+    function handleDeletePlayer() { const id = playerIdInput.value; if (confirm('Are you sure you want to delete this player?')) { players = players.filter(p => p.id !== id); const playerCard = document.getElementById(id); if (playerCard) { playerCard.remove(); } renderPlayers(); clearForm(); showMessage('Player has been deleted.'); } }
     function clearForm() { playerForm.reset(); playerIdInput.value = ''; for (const key in statValueSpans) { statInputs[key].value = 50; statValueSpans[key].textContent = '50'; } addPlayerBtn.classList.remove('hidden'); updatePlayerBtn.classList.add('hidden'); deletePlayerBtn.classList.add('hidden'); document.querySelectorAll('.player.selected').forEach(p => p.classList.remove('selected')); }
     function populateForm(player) { clearForm(); document.querySelectorAll('.player.selected').forEach(p => p.classList.remove('selected')); document.getElementById(player.id)?.classList.add('selected'); playerIdInput.value = player.id; playerNameInput.value = player.name; playerPositionInput.value = player.position; for (const key in player.stats) { statInputs[key].value = player.stats[key]; statValueSpans[key].textContent = player.stats[key]; } addPlayerBtn.classList.add('hidden'); updatePlayerBtn.classList.remove('hidden'); deletePlayerBtn.classList.remove('hidden'); }
     function updateStatValue(e) { const statName = e.target.id; statValueSpans[statName].textContent = e.target.value; }
 
-    // 드래그 앤 드롭 이벤트 핸들러
+    // Drag & Drop Event Handlers
     function handleDragStart(e) { draggedPlayer = e.target; setTimeout(() => { e.target.style.opacity = '0.5'; }, 0); }
     function handleDragEnd(e) { e.target.style.opacity = '1'; draggedPlayer = null; }
     function handleDragOver(e) { e.preventDefault(); e.currentTarget.classList.add('drag-over'); }
@@ -235,10 +276,10 @@ document.addEventListener('DOMContentLoaded', () => {
     function addDragEventsToAllPlayers() { document.querySelectorAll('.player').forEach(player => { player.addEventListener('dragstart', handleDragStart); player.addEventListener('dragend', handleDragEnd); }); }
     function addClickEventsToPlayersInList() { document.querySelectorAll('#player-list .player').forEach(playerCard => { playerCard.addEventListener('click', () => { const player = players.find(p => p.id === playerCard.id); if (player) populateForm(player); }); }); }
 
-    // AI 최적화 로직
+    // AI Optimization Logic
     function optimizeLineup() {
         if (players.length < 11) {
-            showMessage('AI 최적화를 위해서는 최소 11명의 선수가 필요합니다.');
+            showMessage('At least 11 players are required for AI optimization.');
             return;
         }
         resetField();
@@ -284,14 +325,14 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
         renderPlayers();
-        showMessage('AI가 최적 라인업을 배치했습니다. 자유롭게 수정해 보세요!');
+        showMessage('AI has placed the optimal lineup. Feel free to make adjustments!');
     }
     
     function resetField() { [...field.querySelectorAll('.player')].forEach(playerCard => { playerCard.remove(); }); renderPlayers(); }
     function showMessage(message) { messageText.textContent = message; messageModal.classList.remove('hidden'); }
     function hideMessage() { messageModal.classList.add('hidden'); }
 
-    // --- 이벤트 리스너 등록 ---
+    // --- Event Listener Registration ---
     field.addEventListener('dragover', handleDragOver); field.addEventListener('dragleave', handleDragLeave); field.addEventListener('drop', handleDrop);
     playerList.addEventListener('dragover', handleDragOver); playerList.addEventListener('dragleave', handleDragLeave); playerList.addEventListener('drop', handleDrop);
     playerForm.addEventListener('submit', handleFormSubmit);
@@ -299,11 +340,25 @@ document.addEventListener('DOMContentLoaded', () => {
     deletePlayerBtn.addEventListener('click', handleDeletePlayer);
     clearFormBtn.addEventListener('click', clearForm);
     optimizeBtn.addEventListener('click', optimizeLineup);
-    resetBtn.addEventListener('click', () => { resetField(); showMessage('필드 배치가 초기화되었습니다.'); });
+    resetBtn.addEventListener('click', () => { resetField(); showMessage('Field has been reset.'); });
     closeModalBtn.addEventListener('click', hideMessage);
     for (const key in statInputs) { statInputs[key].addEventListener('input', updateStatValue); }
+    
+    printBtn.addEventListener('click', () => window.print());
+    saveImageBtn.addEventListener('click', () => {
+        const originalShadow = field.style.boxShadow;
+        field.style.boxShadow = 'none';
+        html2canvas(field).then(canvas => {
+            field.style.boxShadow = originalShadow;
+            const image = canvas.toDataURL('image/png');
+            const link = document.createElement('a');
+            link.href = image;
+            link.download = 'lineup.png';
+            link.click();
+        });
+    });
 
-    // --- 앱 시작 ---
+    // --- App Start ---
     renderPlayers();
 });
 </script>
